@@ -154,3 +154,8 @@ dist
 *.local
 .env
 >>>>>>> 1bec5fd (feat: add Navbar, Hero, Card, and Footer components)
+
+
+node_modules/
+dist/
+.env
