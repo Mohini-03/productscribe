@@ -1,0 +1,30 @@
+.placeholder {
+  min-height: 56vh;
+  display: flex;
+  align-items: center;
+}
+
+.placeholder__inner {
+  padding: 90px 0;
+  max-width: 640px;
+}
+
+.placeholder__eyebrow {
+  margin-bottom: 16px;
+}
+
+.placeholder__title {
+  font-size: clamp(2rem, 4vw, 2.8rem);
+}
+
+.placeholder__text {
+  margin-top: 18px;
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+}
+
+@media (max-width: 600px) {
+  .placeholder__inner {
+    padding: 56px 0;
+  }
+}
