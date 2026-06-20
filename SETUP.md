@@ -1,5 +1,12 @@
 # ProductScribe — Frontend Skeleton
 
+
+## Setup Instructions
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/Mohini-03/productscribe.git
+
 ## Run it locally
 
 ```bash
@@ -42,3 +49,6 @@ git commit -m "chore: set up global design tokens and base styles"
 If you tweak something later, use `fix: <what broke>` for bug fixes and
 `refactor: <what you reorganized>` for cleanup — avoid messages like
 "update" or "wip".
+
+
+
