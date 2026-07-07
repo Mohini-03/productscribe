@@ -1,0 +1,37 @@
+.ui-input-wrap { display: flex; flex-direction: column; gap: 6px; }
+
+.ui-input__label {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.ui-input {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--line-strong);
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 0.97rem;
+  transition: border-color .15s, box-shadow .15s;
+  box-sizing: border-box;
+}
+.ui-input--textarea { resize: vertical; min-height: 90px; }
+.ui-input:focus {
+  outline: none;
+  border-color: var(--sage);
+  box-shadow: 0 0 0 3px rgba(63,114,104,.18);
+}
+.ui-input-wrap--error .ui-input {
+  border-color: #e0654f;
+}
+.ui-input-wrap--error .ui-input:focus {
+  box-shadow: 0 0 0 3px rgba(224,101,79,.2);
+}
+
+.ui-input__error { font-size: .83rem; color: #e0654f; margin: 0; }
+.ui-input__hint  { font-size: .83rem; color: var(--ink-soft); margin: 0; }

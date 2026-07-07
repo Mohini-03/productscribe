@@ -1,219 +1,174 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar.jsx";
 import Footer from "../components/Footer.jsx";
+import { Button, Input, Loader, Modal, ToastContainer, useToast } from "../components/ui/index.js";
 import { api } from "../api.js";
-import "./Pages.css";
+import { useAuth } from "../context/AuthContext.jsx";
 import "./Dashboard.css";
 
 const TONES = ["friendly", "professional", "festive"];
 
 export default function Dashboard() {
+  const { seller, loading: authLoading, logout } = useAuth();
+  const navigate = useNavigate();
+  const { toasts, showToast, dismissToast } = useToast();
   const [descriptions, setDescriptions] = useState([]);
   const [loading, setLoading]           = useState(true);
-  const [error, setError]               = useState("");
   const [searchQ, setSearchQ]           = useState("");
   const [filterTone, setFilterTone]     = useState("");
 
-  // ── toasts ──────────────────────────────────────────────────────────────
-  const [toast, setToast] = useState(null);
-  function showToast(message, type = "info") {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  }
+  // Redirect to login if there's no session once auth has finished restoring.
+  useEffect(() => {
+    if (!authLoading && !seller) navigate("/login");
+  }, [authLoading, seller, navigate]);
 
-  // ── fetch list ───────────────────────────────────────────────────────────
   const fetchDescriptions = useCallback(async () => {
+    if (!seller) return;
     setLoading(true);
-    setError("");
     try {
-      const result = searchQ.trim()
-        ? await api.searchDescriptions(searchQ.trim())
-        : await api.listDescriptions(filterTone || undefined);
+      let result;
+      if (searchQ.trim()) {
+        result = await api.searchDescriptions(searchQ.trim());
+      } else {
+        result = await api.listDescriptions(filterTone || undefined);
+      }
       setDescriptions(result.data);
     } catch (err) {
-      setError(err.message);
-      showToast(err.message, "error");
+      showToast(err.message || "Failed to load descriptions", "error");
     } finally {
       setLoading(false);
     }
-  }, [searchQ, filterTone]);
+  }, [seller, searchQ, filterTone, showToast]);
 
   useEffect(() => { fetchDescriptions(); }, [fetchDescriptions]);
 
-  // ── create form ──────────────────────────────────────────────────────────
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm]         = useState({ productName:"", category:"", tone:"friendly", price:"", rawNotes:"" });
-  const [saving, setSaving]     = useState(false);
-  const [formErrors, setFormErrors] = useState({});
+  function handleLogout() {
+    logout();
+    navigate("/login");
+  }
 
-  function setField(k, v) {
-    setForm(f => ({ ...f, [k]: v }));
-    setFormErrors(e => ({ ...e, [k]: "" }));
+  const [createOpen, setCreateOpen] = useState(false);
+  const [form, setForm]             = useState({ productName:"", category:"", tone:"friendly", price:"", rawNotes:"" });
+  const [formErrors, setFormErrors] = useState({});
+  const [saving, setSaving]         = useState(false);
+
+  function setField(key, value) {
+    setForm((f) => ({ ...f, [key]: value }));
+    setFormErrors((e) => ({ ...e, [key]: "" }));
+  }
+
+  function validateForm() {
+    const errs = {};
+    if (!form.productName.trim()) errs.productName = "Product name is required";
+    if (!form.rawNotes.trim())    errs.rawNotes    = "Product notes are required";
+    return errs;
   }
 
   async function handleCreate(e) {
     e.preventDefault();
-    const errs = {};
-    if (!form.productName.trim()) errs.productName = "Required";
-    if (!form.rawNotes.trim())    errs.rawNotes    = "Required";
+    const errs = validateForm();
     if (Object.keys(errs).length) { setFormErrors(errs); return; }
     setSaving(true);
     try {
       await api.createDescription(form);
       showToast("Description created!", "success");
-      setShowForm(false);
+      setCreateOpen(false);
       setForm({ productName:"", category:"", tone:"friendly", price:"", rawNotes:"" });
       fetchDescriptions();
     } catch (err) {
-      showToast(err.message, "error");
+      showToast(err.message || "Failed to create description", "error");
     } finally {
       setSaving(false);
     }
   }
 
-  // ── delete ───────────────────────────────────────────────────────────────
   const [deleting, setDeleting] = useState(null);
   async function handleDelete(id, name) {
-    if (!window.confirm(`Delete "${name}"?`)) return;
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
     setDeleting(id);
     try {
       await api.deleteDescription(id);
-      showToast("Deleted", "info");
+      showToast("Description deleted", "info");
       fetchDescriptions();
     } catch (err) {
-      showToast(err.message, "error");
+      showToast(err.message || "Failed to delete", "error");
     } finally {
       setDeleting(null);
     }
   }
 
+  if (authLoading || !seller) {
+    return (
+      <>
+        <Navbar />
+        <main className="dashboard">
+          <div className="container"><Loader size="lg" /></div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
   return (
     <>
       <Navbar />
-      <main style={{ padding: "48px 0 80px", minHeight: "60vh" }}>
+      <main className="dashboard">
         <div className="container">
-
-          {/* header */}
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:16, marginBottom:32 }}>
+          <div className="dashboard__head">
             <div>
-              <p className="eyebrow">Your dashboard</p>
-              <h1 style={{ fontSize:"clamp(1.6rem,3vw,2.1rem)", marginTop:10 }}>Every description you've written</h1>
+              <p className="eyebrow">{seller.businessName}</p>
+              <h1 className="dashboard__title">Every description you've written</h1>
             </div>
-            <button className="btn btn-primary" onClick={() => setShowForm(v => !v)}>
-              {showForm ? "✕ Cancel" : "+ New description"}
-            </button>
+            <div className="dashboard__head-actions">
+              <Button onClick={() => setCreateOpen(true)}>+ New description</Button>
+              <Button variant="ghost" onClick={handleLogout}>Log out</Button>
+            </div>
           </div>
 
-          {/* create form */}
-          {showForm && (
-            <form onSubmit={handleCreate} style={{ background:"var(--white)", border:"1px solid var(--line)", borderRadius:16, padding:28, marginBottom:32, display:"flex", flexDirection:"column", gap:16 }}>
-              <h3 style={{ margin:0 }}>New product description</h3>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
-                <div>
-                  <label style={{ fontSize:".76rem", fontFamily:"var(--font-mono)", textTransform:"uppercase", letterSpacing:".07em", color:"var(--ink-soft)", display:"block", marginBottom:6 }}>Product name *</label>
-                  <input value={form.productName} onChange={e => setField("productName", e.target.value)}
-                    placeholder="e.g. Breezy Red Cotton Kurta"
-                    style={{ width:"100%", padding:"10px 14px", borderRadius:8, border:`1px solid ${formErrors.productName ? "#e0654f" : "var(--line-strong)"}`, background:"var(--white)", color:"var(--ink)", fontFamily:"var(--font-body)", fontSize:".95rem", boxSizing:"border-box" }} />
-                  {formErrors.productName && <p style={{ color:"#e0654f", fontSize:".82rem", margin:"4px 0 0" }}>{formErrors.productName}</p>}
-                </div>
-                <div>
-                  <label style={{ fontSize:".76rem", fontFamily:"var(--font-mono)", textTransform:"uppercase", letterSpacing:".07em", color:"var(--ink-soft)", display:"block", marginBottom:6 }}>Category</label>
-                  <input value={form.category} onChange={e => setField("category", e.target.value)}
-                    placeholder="e.g. Clothing"
-                    style={{ width:"100%", padding:"10px 14px", borderRadius:8, border:"1px solid var(--line-strong)", background:"var(--white)", color:"var(--ink)", fontFamily:"var(--font-body)", fontSize:".95rem", boxSizing:"border-box" }} />
-                </div>
-              </div>
-
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
-                <div>
-                  <label style={{ fontSize:".76rem", fontFamily:"var(--font-mono)", textTransform:"uppercase", letterSpacing:".07em", color:"var(--ink-soft)", display:"block", marginBottom:6 }}>Price</label>
-                  <input value={form.price} onChange={e => setField("price", e.target.value)}
-                    placeholder="e.g. ₹599"
-                    style={{ width:"100%", padding:"10px 14px", borderRadius:8, border:"1px solid var(--line-strong)", background:"var(--white)", color:"var(--ink)", fontFamily:"var(--font-body)", fontSize:".95rem", boxSizing:"border-box" }} />
-                </div>
-                <div>
-                  <label style={{ fontSize:".76rem", fontFamily:"var(--font-mono)", textTransform:"uppercase", letterSpacing:".07em", color:"var(--ink-soft)", display:"block", marginBottom:6 }}>Tone</label>
-                  <div style={{ display:"flex", gap:8 }}>
-                    {TONES.map(t => (
-                      <button key={t} type="button" onClick={() => setField("tone", t)}
-                        style={{ padding:"8px 14px", borderRadius:999, border:"1px solid var(--line-strong)", background: form.tone===t ? "var(--ink)" : "transparent", color: form.tone===t ? "var(--paper)" : "var(--ink-soft)", cursor:"pointer", fontSize:".85rem", fontFamily:"var(--font-body)", textTransform:"capitalize" }}>
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize:".76rem", fontFamily:"var(--font-mono)", textTransform:"uppercase", letterSpacing:".07em", color:"var(--ink-soft)", display:"block", marginBottom:6 }}>Product notes *</label>
-                <textarea value={form.rawNotes} onChange={e => setField("rawNotes", e.target.value)}
-                  rows={3} placeholder="red cotton kurta, size m, ₹599, soft fabric, good for summer"
-                  style={{ width:"100%", padding:"10px 14px", borderRadius:8, border:`1px solid ${formErrors.rawNotes ? "#e0654f" : "var(--line-strong)"}`, background:"var(--white)", color:"var(--ink)", fontFamily:"var(--font-body)", fontSize:".95rem", boxSizing:"border-box", resize:"vertical" }} />
-                {formErrors.rawNotes && <p style={{ color:"#e0654f", fontSize:".82rem", margin:"4px 0 0" }}>{formErrors.rawNotes}</p>}
-              </div>
-
-              <div style={{ display:"flex", justifyContent:"flex-end", gap:12 }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setShowForm(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>
-                  {saving ? "Saving…" : "Generate & Save"}
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* search + filter */}
-          <div style={{ display:"flex", gap:14, flexWrap:"wrap", marginBottom:28, alignItems:"center" }}>
-            <input value={searchQ} onChange={e => setSearchQ(e.target.value)}
+          <div className="dashboard__toolbar">
+            <Input
               placeholder="Search descriptions…"
-              style={{ flex:1, minWidth:200, padding:"10px 14px", borderRadius:8, border:"1px solid var(--line-strong)", background:"var(--white)", color:"var(--ink)", fontFamily:"var(--font-body)", fontSize:".95rem" }} />
-            <div style={{ display:"flex", gap:8 }}>
-              {["", ...TONES].map(t => (
-                <button key={t||"all"} onClick={() => { setFilterTone(t); setSearchQ(""); }}
-                  style={{ padding:"8px 16px", borderRadius:999, border:"1px solid var(--line-strong)", background: filterTone===t ? "var(--ink)" : "transparent", color: filterTone===t ? "var(--paper)" : "var(--ink-soft)", cursor:"pointer", fontFamily:"var(--font-body)", fontSize:".88rem", textTransform:"capitalize" }}>
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              className="dashboard__search"
+            />
+            <div className="dashboard__filters">
+              {["", ...TONES].map((t) => (
+                <button key={t || "all"} className={`filter-pill ${filterTone === t ? "filter-pill--active" : ""}`}
+                  onClick={() => { setFilterTone(t); setSearchQ(""); }}>
                   {t || "All"}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* content */}
           {loading ? (
-            <div style={{ display:"flex", justifyContent:"center", padding:80 }}>
-              <div style={{ width:40, height:40, border:"3px solid var(--line)", borderTopColor:"var(--sage)", borderRadius:"50%", animation:"spin .7s linear infinite" }} />
-              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-            </div>
-          ) : error ? (
-            <div style={{ textAlign:"center", padding:60, color:"#e0654f" }}>
-              <p>⚠ {error}</p>
-              <button className="btn btn-ghost" onClick={fetchDescriptions}>Retry</button>
-            </div>
+            <Loader size="lg" />
           ) : descriptions.length === 0 ? (
-            <div style={{ textAlign:"center", padding:80, color:"var(--ink-soft)" }}>
-              <p>No descriptions yet.</p>
-              <button className="btn btn-primary" style={{ marginTop:16 }} onClick={() => setShowForm(true)}>+ New description</button>
+            <div className="dashboard__empty">
+              <p>No descriptions yet. Create your first one!</p>
+              <Button onClick={() => setCreateOpen(true)}>+ New description</Button>
             </div>
           ) : (
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:22 }}>
-              {descriptions.map(d => (
-                <article key={d.id} style={{ background:"var(--white)", border:"1px solid var(--line)", borderRadius:16, padding:22, display:"flex", flexDirection:"column", gap:10 }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                    <span style={{ padding:"3px 10px", borderRadius:999, fontFamily:"var(--font-mono)", fontSize:".72rem", textTransform:"uppercase", background: d.tone==="friendly" ? "rgba(63,114,104,.14)" : d.tone==="festive" ? "rgba(232,163,61,.18)" : "rgba(75,86,112,.12)", color: d.tone==="friendly" ? "var(--sage-deep)" : d.tone==="festive" ? "var(--saffron-deep)" : "var(--ink-soft)" }}>
-                      {d.tone}
-                    </span>
-                    <span style={{ fontFamily:"var(--font-mono)", fontSize:".85rem", color:"var(--ink-soft)" }}>{d.price}</span>
+            <div className="desc-grid">
+              {descriptions.map((d) => (
+                <article key={d.id} className="desc-card">
+                  <div className="desc-card__top">
+                    <span className={`tone-badge tone-badge--${d.tone}`}>{d.tone}</span>
+                    <span className="desc-card__price">{d.price}</span>
                   </div>
-                  <h3 style={{ fontSize:"1.08rem", margin:0 }}>{d.productName}</h3>
-                  <p style={{ color:"var(--ink-soft)", fontSize:".93rem", flex:1 }}>{d.generatedDescription}</p>
-                  <div style={{ display:"flex", gap:8, paddingTop:10, borderTop:"1px solid var(--line)" }}>
-                    <button className="btn btn-ghost" style={{ padding:"7px 14px", fontSize:".85rem" }}
+                  <h3 className="desc-card__name">{d.productName}</h3>
+                  <p className="desc-card__body">{d.generatedDescription}</p>
+                  <div className="desc-card__actions">
+                    <Button variant="ghost" size="sm"
                       onClick={() => { navigator.clipboard.writeText(d.generatedDescription); showToast("Copied!", "success"); }}>
                       Copy
-                    </button>
-                    <button className="btn" style={{ padding:"7px 14px", fontSize:".85rem", background:"#e0654f", color:"#fff", border:"none", borderRadius:999 }}
-                      disabled={deleting === d.id}
+                    </Button>
+                    <Button variant="danger" size="sm" loading={deleting === d.id}
                       onClick={() => handleDelete(d.id, d.productName)}>
-                      {deleting === d.id ? "Deleting…" : "Delete"}
-                    </button>
+                      Delete
+                    </Button>
                   </div>
                 </article>
               ))}
@@ -222,13 +177,40 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* Toast */}
-      {toast && (
-        <div style={{ position:"fixed", bottom:24, right:24, padding:"13px 20px", borderRadius:14, fontFamily:"var(--font-body)", fontSize:".93rem", boxShadow:"0 8px 24px -6px rgba(31,42,68,.3)", background: toast.type==="success" ? "#f0faf6" : toast.type==="error" ? "#fef3f0" : "#f0f4ff", color: toast.type==="success" ? "#1f4038" : toast.type==="error" ? "#7a2718" : "#1e3060", borderLeft: `4px solid ${toast.type==="success" ? "#3f7268" : toast.type==="error" ? "#e0654f" : "#4a72c0"}`, zIndex:300, minWidth:240 }}>
-          {toast.message}
-        </div>
-      )}
+      <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} title="New product description" size="md">
+        <form onSubmit={handleCreate} className="create-form">
+          <Input label="Product name" value={form.productName}
+            onChange={(e) => setField("productName", e.target.value)}
+            error={formErrors.productName} placeholder="e.g. Breezy Red Cotton Kurta" />
+          <div className="create-form__row">
+            <Input label="Category" value={form.category}
+              onChange={(e) => setField("category", e.target.value)} placeholder="e.g. Clothing" />
+            <Input label="Price" value={form.price}
+              onChange={(e) => setField("price", e.target.value)} placeholder="e.g. ₹599" />
+          </div>
+          <div className="create-form__tones">
+            <p className="create-form__tone-label">Tone</p>
+            <div className="create-form__tone-row">
+              {TONES.map((t) => (
+                <button key={t} type="button"
+                  className={`tone-pill ${form.tone === t ? "tone-pill--active" : ""}`}
+                  onClick={() => setField("tone", t)}>{t}</button>
+              ))}
+            </div>
+          </div>
+          <Input label="Product notes" multiline rows={3} value={form.rawNotes}
+            onChange={(e) => setField("rawNotes", e.target.value)}
+            error={formErrors.rawNotes}
+            hint="Jot down details — material, size, colour, price. No need for full sentences."
+            placeholder="red cotton kurta, size m, ₹599, soft fabric, good for summer" />
+          <div className="create-form__footer">
+            <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button type="submit" loading={saving}>Generate &amp; Save</Button>
+          </div>
+        </form>
+      </Modal>
 
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <Footer />
     </>
   );

@@ -1,10 +1,14 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const connectDB = require("./config/db");
+const authRouter = require("./routes/auth");
 const descriptionsRouter = require("./routes/descriptions");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+connectDB();
 
 app.use(cors({ origin: process.env.FRONTEND_ORIGIN || "http://localhost:5173" }));
 app.use(express.json());
@@ -18,6 +22,7 @@ app.get("/", (_req, res) => {
   res.status(200).json({ app: "ProductScribe API", status: "running" });
 });
 
+app.use("/api/auth", authRouter);
 app.use("/api/descriptions", descriptionsRouter);
 
 app.use((_req, res) => res.status(404).json({ error: "Route not found" }));

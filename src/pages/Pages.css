@@ -28,3 +28,36 @@
     padding: 56px 0;
   }
 }
+
+/* ─── Auth forms (Login / Signup) ─────────────────────────────────────── */
+.auth-form-wrap {
+  max-width: 420px;
+}
+
+.auth-form {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.auth-form__submit {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.auth-form__switch {
+  margin-top: 22px;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.auth-form__switch a {
+  color: var(--saffron-deep);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-form__switch a:hover {
+  text-decoration: underline;
+}
