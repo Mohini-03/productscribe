@@ -1,16 +1,16 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 
 // Hook to manage toast state
 export function useToast() {
   const [toasts, setToasts] = useState([]);
 
-  function showToast(message, type = "info") {
+  const showToast = useCallback((message, type = "info") => {
     setToasts((prev) => [...prev, { message, type }]);
-  }
+  }, []);
 
-  function dismissToast(index) {
+  const dismissToast = useCallback((index) => {
     setToasts((prev) => prev.filter((_, i) => i !== index));
-  }
+  }, []);
 
   return { toasts, showToast, dismissToast };
 }
