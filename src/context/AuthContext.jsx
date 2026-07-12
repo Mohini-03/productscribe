@@ -9,7 +9,6 @@ export function AuthProvider({ children }) {
   const [seller, setSeller] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // On first load, if a token is saved, restore the session by fetching the profile.
   useEffect(() => {
     let cancelled = false;
     async function restore() {
@@ -21,7 +20,6 @@ export function AuthProvider({ children }) {
         const res = await api.me(token);
         if (!cancelled) setSeller(res.seller);
       } catch {
-        // Token expired or invalid — clear it.
         if (!cancelled) {
           localStorage.removeItem(TOKEN_KEY);
           setToken(null);
@@ -57,8 +55,21 @@ export function AuthProvider({ children }) {
     setSeller(null);
   }, []);
 
+  // Used by the OAuth callback page: we already have a valid JWT handed to us
+  // by the backend after a successful Google login, so just store it and fetch
+  // the profile — no credentials to submit here.
+  const loginWithToken = useCallback(async (jwt) => {
+    localStorage.setItem(TOKEN_KEY, jwt);
+    setToken(jwt);
+    const res = await api.me(jwt);
+    setSeller(res.seller);
+    return res.seller;
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ token, seller, loading, login, signup, logout }}>
+    <AuthContext.Provider
+      value={{ token, seller, loading, login, signup, logout, loginWithToken }}
+    >
       {children}
     </AuthContext.Provider>
   );

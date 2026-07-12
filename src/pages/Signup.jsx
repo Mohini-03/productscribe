@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import Navbar from "../components/Navbar.jsx";
 import Footer from "../components/Footer.jsx";
+import GoogleButton from "../components/GoogleButton.jsx";
 import { Button, Input, ToastContainer, useToast } from "../components/ui/index.js";
 
 import { useAuth } from "../context/AuthContext.jsx";
@@ -86,6 +87,9 @@ export default function Signup() {
               Create account
             </Button>
           </form>
+
+          <div className="auth-divider">or</div>
+          <GoogleButton label="Sign up with Google" />
 
           <p className="auth-form__switch">
             Already have an account? <Link to="/login">Log in</Link>

@@ -4,7 +4,7 @@ import { useTheme } from "../context/ThemeContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import "./Navbar.css";
 
-const links = [
+const baseLinks = [
   { to: "/", label: "Home" },
   { to: "/about", label: "About" },
   { to: "/dashboard", label: "Dashboard" },
@@ -15,6 +15,9 @@ export default function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const { seller, logout } = useAuth();
   const navigate = useNavigate();
+
+  // Profile only makes sense once you're signed in.
+  const links = seller ? [...baseLinks, { to: "/profile", label: "Profile" }] : baseLinks;
 
   function handleAuthClick() {
     setOpen(false);
