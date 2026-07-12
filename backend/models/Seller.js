@@ -3,6 +3,11 @@ const mongoose = require("mongoose");
 // ─── Seller schema ───────────────────────────────────────────────────────────
 // A seller is the account that logs in and owns a set of product descriptions.
 // Passwords are always stored as bcrypt hashes — never plaintext.
+//
+// A seller can sign up either with email+password, or via Google OAuth.
+// - Local accounts: passwordHash is set, googleId is null.
+// - Google accounts: googleId is set, passwordHash is null.
+// authProvider tracks which flow created the account, mainly for UI/debugging.
 const sellerSchema = new mongoose.Schema(
   {
     businessName: {
@@ -20,7 +25,18 @@ const sellerSchema = new mongoose.Schema(
     },
     passwordHash: {
       type: String,
-      required: true,
+      default: null, // null for Google-only accounts
+    },
+    googleId: {
+      type: String,
+      default: null,
+      unique: true,
+      sparse: true, // allows many docs with googleId: null
+    },
+    authProvider: {
+      type: String,
+      enum: ["local", "google"],
+      default: "local",
     },
   },
   { timestamps: true } // adds createdAt / updatedAt automatically
