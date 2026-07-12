@@ -153,7 +153,7 @@ export default function Dashboard() {
           ) : (
             <div className="desc-grid">
               {descriptions.map((d) => (
-                <article key={d.id} className="desc-card">
+                <article key={d._id} className="desc-card">
                   <div className="desc-card__top">
                     <span className={`tone-badge tone-badge--${d.tone}`}>{d.tone}</span>
                     <span className="desc-card__price">{d.price}</span>
@@ -165,8 +165,8 @@ export default function Dashboard() {
                       onClick={() => { navigator.clipboard.writeText(d.generatedDescription); showToast("Copied!", "success"); }}>
                       Copy
                     </Button>
-                    <Button variant="danger" size="sm" loading={deleting === d.id}
-                      onClick={() => handleDelete(d.id, d.productName)}>
+                    <Button variant="danger" size="sm" loading={deleting === d._id}
+                      onClick={() => handleDelete(d._id, d.productName)}>
                       Delete
                     </Button>
                   </div>
