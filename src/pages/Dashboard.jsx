@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Navbar from "../components/Navbar.jsx";
 import Footer from "../components/Footer.jsx";
 import { Button, Input, Loader, Modal, ToastContainer, useToast } from "../components/ui/index.js";
@@ -12,6 +12,7 @@ const TONES = ["friendly", "professional", "festive"];
 export default function Dashboard() {
   const { seller, loading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toasts, showToast, dismissToast } = useToast();
   const [descriptions, setDescriptions] = useState([]);
   const [loading, setLoading]           = useState(true);
@@ -22,6 +23,19 @@ export default function Dashboard() {
   useEffect(() => {
     if (!authLoading && !seller) navigate("/login");
   }, [authLoading, seller, navigate]);
+
+  // Signup redirects here with { justSignedUp: true } in router state (since
+  // its own page — and ToastContainer — unmounts the instant it navigates
+  // away, a toast fired there would never actually be seen). Show it here
+  // instead, once, then clear the state so refreshing or navigating back
+  // doesn't re-trigger it.
+  useEffect(() => {
+    if (location.state?.justSignedUp) {
+      showToast("Account created — welcome to ProductScribe!", "success");
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchDescriptions = useCallback(async () => {
     if (!seller) return;
@@ -53,9 +67,20 @@ export default function Dashboard() {
   const [formErrors, setFormErrors] = useState({});
   const [saving, setSaving]         = useState(false);
 
+  // AI preview state — separate from `form` because it's not a form field,
+  // it's a generated result the seller can accept (by saving) or ignore.
+  const [aiDescription, setAiDescription] = useState("");
+  const [aiLoading, setAiLoading]         = useState(false);
+
   function setField(key, value) {
     setForm((f) => ({ ...f, [key]: value }));
     setFormErrors((e) => ({ ...e, [key]: "" }));
+    // productName/rawNotes changing means any existing AI preview no longer
+    // matches what was asked for — clear it rather than let it go stale and
+    // get saved alongside notes it doesn't actually describe.
+    if ((key === "productName" || key === "rawNotes") && aiDescription) {
+      setAiDescription("");
+    }
   }
 
   function validateForm() {
@@ -65,16 +90,39 @@ export default function Dashboard() {
     return errs;
   }
 
+  function closeCreateModal() {
+    setCreateOpen(false);
+    setForm({ productName:"", category:"", tone:"friendly", price:"", rawNotes:"" });
+    setFormErrors({});
+    setAiDescription("");
+  }
+
+  async function handleGenerateWithAI() {
+    const errs = validateForm();
+    if (Object.keys(errs).length) { setFormErrors(errs); return; }
+    setAiLoading(true);
+    try {
+      const result = await api.generateWithGemini(form);
+      setAiDescription(result.data.generatedDescription);
+    } catch (err) {
+      showToast(err.message || "AI generation failed — try again", "error");
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
   async function handleCreate(e) {
     e.preventDefault();
     const errs = validateForm();
     if (Object.keys(errs).length) { setFormErrors(errs); return; }
     setSaving(true);
     try {
-      await api.createDescription(form);
+      // If the seller generated (and optionally edited) an AI description,
+      // save that. Otherwise the description is just their raw notes as
+      // typed — descriptions.js on the backend applies that same fallback.
+      await api.createDescription({ ...form, generatedDescription: aiDescription || undefined });
       showToast("Description created!", "success");
-      setCreateOpen(false);
-      setForm({ productName:"", category:"", tone:"friendly", price:"", rawNotes:"" });
+      closeCreateModal();
       fetchDescriptions();
     } catch (err) {
       showToast(err.message || "Failed to create description", "error");
@@ -177,7 +225,7 @@ export default function Dashboard() {
         </div>
       </main>
 
-      <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} title="New product description" size="md">
+      <Modal isOpen={createOpen} onClose={closeCreateModal} title="New product description" size="md">
         <form onSubmit={handleCreate} className="create-form">
           <Input label="Product name" value={form.productName}
             onChange={(e) => setField("productName", e.target.value)}
@@ -203,9 +251,48 @@ export default function Dashboard() {
             error={formErrors.rawNotes}
             hint="Jot down details — material, size, colour, price. No need for full sentences."
             placeholder="red cotton kurta, size m, ₹599, soft fabric, good for summer" />
+
+          <div className="ai-generate">
+            <Button
+              type="button"
+              variant="ghost"
+              className="ai-generate__btn"
+              loading={aiLoading}
+              onClick={handleGenerateWithAI}
+            >
+              ✨ Generate with Gemini
+            </Button>
+            {!aiDescription && !aiLoading && (
+              <p className="ai-generate__hint">
+                Optional — skip this and your notes above are saved as the description as-is.
+              </p>
+            )}
+          </div>
+
+          {aiLoading && (
+            <div className="ai-preview ai-preview--loading">
+              <Loader size="sm" label="Asking Gemini…" />
+            </div>
+          )}
+
+          {aiDescription && !aiLoading && (
+            <div className="ai-preview">
+              <p className="ai-preview__label">AI-generated description — edit freely, this is what gets saved</p>
+              <Input
+                multiline
+                rows={3}
+                value={aiDescription}
+                onChange={(e) => setAiDescription(e.target.value)}
+              />
+              <button type="button" className="ai-preview__clear" onClick={() => setAiDescription("")}>
+                Discard AI version, use my notes instead
+              </button>
+            </div>
+          )}
+
           <div className="create-form__footer">
-            <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button type="submit" loading={saving}>Generate &amp; Save</Button>
+            <Button type="button" variant="ghost" onClick={closeCreateModal}>Cancel</Button>
+            <Button type="submit" loading={saving}>Save</Button>
           </div>
         </form>
       </Modal>

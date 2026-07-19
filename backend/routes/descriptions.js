@@ -86,8 +86,22 @@ router.post("/", async (req, res, next) => {
       return res.status(400).json({ error: "Validation failed", details: errors });
     }
 
-    const { productName, category = "", tone = "friendly", price = "", rawNotes } =
-      req.body;
+    const {
+      productName,
+      category = "",
+      tone = "friendly",
+      price = "",
+      rawNotes,
+      generatedDescription, // present only if the seller used "Generate with Gemini" first
+    } = req.body;
+
+    // No AI generation step used → the description is just the seller's own
+    // notes, verbatim. This is intentionally NOT the old mockGenerate template —
+    // if they didn't ask for AI help, they get exactly what they wrote.
+    const finalDescription =
+      generatedDescription && generatedDescription.trim()
+        ? generatedDescription.trim()
+        : rawNotes.trim();
 
     const newDesc = await Description.create({
       seller: req.sellerId,
@@ -96,7 +110,7 @@ router.post("/", async (req, res, next) => {
       tone,
       price: price.trim(),
       rawNotes: rawNotes.trim(),
-      generatedDescription: mockGenerate(rawNotes, tone),
+      generatedDescription: finalDescription,
     });
 
     res.status(201).json({ message: "Description created", data: newDesc });
@@ -119,10 +133,13 @@ router.put("/:id", async (req, res, next) => {
     delete updates._id;
     delete updates.seller; // ownership is immutable
 
-    if (updates.rawNotes !== undefined || updates.tone !== undefined) {
+    if (updates.generatedDescription === undefined &&
+        (updates.rawNotes !== undefined || updates.tone !== undefined)) {
+      // rawNotes or tone changed but no new AI/manual description was supplied
+      // alongside it — fall back to the (possibly edited) raw notes verbatim,
+      // same rule as creation: no AI used means the notes ARE the description.
       const nextNotes = updates.rawNotes !== undefined ? updates.rawNotes : current.rawNotes;
-      const nextTone = updates.tone !== undefined ? updates.tone : current.tone;
-      updates.generatedDescription = mockGenerate(nextNotes, nextTone);
+      updates.generatedDescription = nextNotes.trim();
     }
 
     Object.assign(current, updates);

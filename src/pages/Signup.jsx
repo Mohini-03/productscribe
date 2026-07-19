@@ -38,8 +38,10 @@ export default function Signup() {
     setSubmitting(true);
     try {
       await signup(form.businessName.trim(), form.email.trim(), form.password);
-      showToast("Account created — welcome to ProductScribe!", "success");
-      navigate("/dashboard");
+      // Don't showToast here — this page unmounts the instant navigate() runs,
+      // taking its ToastContainer with it before the message could render.
+      // Dashboard picks this flag up and shows the message itself instead.
+      navigate("/dashboard", { state: { justSignedUp: true } });
     } catch (err) {
       showToast(err.message || "Signup failed", "error");
     } finally {

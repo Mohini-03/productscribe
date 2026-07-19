@@ -6,6 +6,7 @@ const { body, validationResult } = require("express-validator");
 const { OAuth2Client } = require("google-auth-library");
 const router = express.Router();
 const Seller = require("../models/Seller");
+const Description = require("../models/Description");
 const requireAuth = require("../middleware/auth");
 const { loginLimiter, registerLimiter } = require("../middleware/rateLimiter");
 
@@ -100,6 +101,42 @@ router.get("/me", requireAuth, async (req, res, next) => {
     const seller = await Seller.findById(req.sellerId);
     if (!seller) return res.status(404).json({ error: "Seller not found" });
     res.status(200).json({ seller });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── DELETE /api/auth/me ─────────────────────────────────────────────────────
+// Permanently deletes the logged-in seller's account and every description
+// they own. This is destructive and irreversible — there's no soft-delete or
+// recovery here, so the frontend must confirm with the user before calling it.
+//
+// For local (email/password) accounts, the current password must be sent in
+// the body as an extra confirmation that the person deleting the account is
+// actually the account owner, not just someone with a stolen/leaked token.
+// Google-only accounts have no password to check, so the confirmation there
+// relies entirely on requireAuth (a valid, unexpired JWT) plus the frontend's
+// confirmation dialog.
+router.delete("/me", requireAuth, async (req, res, next) => {
+  try {
+    const seller = await Seller.findById(req.sellerId);
+    if (!seller) return res.status(404).json({ error: "Seller not found" });
+
+    if (seller.passwordHash) {
+      const { password } = req.body;
+      if (!password) {
+        return res.status(400).json({ error: "Password is required to delete your account" });
+      }
+      const match = await bcrypt.compare(password, seller.passwordHash);
+      if (!match) {
+        return res.status(401).json({ error: "Incorrect password" });
+      }
+    }
+
+    await Description.deleteMany({ seller: seller._id });
+    await Seller.deleteOne({ _id: seller._id });
+
+    res.status(200).json({ message: "Account and all associated data deleted" });
   } catch (err) {
     next(err);
   }

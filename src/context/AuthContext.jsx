@@ -55,9 +55,6 @@ export function AuthProvider({ children }) {
     setSeller(null);
   }, []);
 
-  // Used by the OAuth callback page: we already have a valid JWT handed to us
-  // by the backend after a successful Google login, so just store it and fetch
-  // the profile — no credentials to submit here.
   const loginWithToken = useCallback(async (jwt) => {
     localStorage.setItem(TOKEN_KEY, jwt);
     setToken(jwt);
@@ -66,9 +63,19 @@ export function AuthProvider({ children }) {
     return res.seller;
   }, []);
 
+  // Permanently deletes the account (and, on the backend, every description
+  // it owns). password is only required for local accounts — the Profile
+  // page only asks for it when seller.authProvider === "local".
+  const deleteAccount = useCallback(async (password) => {
+    await api.deleteAccount(password);
+    localStorage.removeItem(TOKEN_KEY);
+    setToken(null);
+    setSeller(null);
+  }, []);
+
   return (
     <AuthContext.Provider
-      value={{ token, seller, loading, login, signup, logout, loginWithToken }}
+      value={{ token, seller, loading, login, signup, logout, loginWithToken, deleteAccount }}
     >
       {children}
     </AuthContext.Provider>
